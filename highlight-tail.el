@@ -4,7 +4,7 @@
 ;; Keywords: highlight tail eye-candy visual-effect light color burn
 ;; Web page: http://nic-nac-project.net/~necui/ht.html
 
-(defconst highlight-tail-version "1.3.9"
+(defconst highlight-tail-version "1.4b"
   "The current version of `highlight-tail-mode'.")
 
 ;; This file is not part of GNU Emacs.
@@ -429,7 +429,8 @@ This is called by `highlight-tail-post-command'."
           (highlight-tail-update-const-overlays-list))
       ;; not const highlighting - make new overlay in the current place
       ;; with face-value of 1 (brightest)
-      (highlight-tail-make-new-overlay))))
+      (highlight-tail-make-new-overlay))
+    (highlight-tail-start-timers)))
 
 (defun highlight-tail-post-command ()
   "Check for the last command and decide to refresh highlighting or not."
@@ -544,7 +545,7 @@ that if there is ht's overlay at at the top then return 'default"
     ;; remove any highlight-tail's overlays at point
     (let ((overlays-at-start-point (highlight-tail-overlays-at start-point))
           highlight-tail-overlay)
-      (mapcar '(lambda (overlay)
+      (mapcar (lambda (overlay)
                  (when (highlight-tail-overlay-get overlay 'highlight-tail)
                    (setq highlight-tail-overlay overlay)))
               overlays-at-start-point)
@@ -670,6 +671,7 @@ Such as compute new faces, purge old overlays etc.
 
 This is called every `highlight-tail-timer' amount of time."
   (sit-for 0)
+  ;; (message "highlight-tail-fade-out-step: hi") ; debug
   ;; if mode had been just disabled - delete all overlays
   ;; and cancel timers
   (if (not highlight-tail-mode)
@@ -705,13 +707,15 @@ This is called every `highlight-tail-timer' amount of time."
 
                 (setq iterator (1+ iterator))))))
       ;; if not const-highlighting
-      (when (> (hash-table-count highlight-tail-overlays-hash) 0)
-        (maphash 'highlight-tail-fade-out-step-process-overlay
-                 highlight-tail-overlays-hash)))))
+      (if (> (hash-table-count highlight-tail-overlays-hash) 0)
+          (maphash 'highlight-tail-fade-out-step-process-overlay
+                   highlight-tail-overlays-hash)
+        (highlight-tail-cancel-timers)))))
 
 (defun highlight-tail-fade-out-step-process-overlay (key value)
   "Process every KEY in `highlight-tail-overlays-hash'."
   (let ((cur-face-number (car (last value))))
+    ;; (message "number: %s" cur-face-number) ; debug
     (if (< cur-face-number highlight-tail-face-max)
         (progn
           (setq cur-face-number (1+ cur-face-number))
@@ -763,7 +767,7 @@ Where 'default is `highlight-tail-default-background-color'"
            (for-what-colors-list
             (let ((temp (mapcar         ; *copy* elements of
                                         ; `highlight-tail-colors-with-100'
-                         '(lambda (elem) elem) ; to temporary variable
+                         (lambda (elem) elem) ; to temporary variable
                          highlight-tail-colors-with-100)))
               (setcar (last temp) (cons for-what 100))
               temp))
@@ -880,7 +884,7 @@ From COLOR-FROM to COLOR-TO             ; STEPS-COUNT length."
             (color-values color-name)))
     ;; color intensities take two bits, and we want them to take one
     (setq colors-list-to-return
-          (mapcar '(lambda (elem) (round (* (/ elem 65535.0) 255)))
+          (mapcar (lambda (elem) (round (* (/ elem 65535.0) 255)))
                   colors-list-to-return))
     (add-to-list 'colors-list-to-return color-name)
     colors-list-to-return))
@@ -928,6 +932,27 @@ length of colors-fade-table from COLORS-FADE-TABLE-WITH-KEY"
           highlight-tail-face-max nil)
     (highlight-tail-cancel-timers)))
 
+(defun highlight-tail-start-timers ()
+  (cancel-function-timers 'highlight-tail-fade-out-step)
+  (cancel-function-timers 'highlight-tail-check-if-defaultbgcolor-changed)
+
+  (setq highlight-tail-fading-timer
+        (if (featurep 'xemacs)
+            (start-itimer "highlight-tail-fade-out-step"
+                          'highlight-tail-fade-out-step
+                          highlight-tail-timer
+                          highlight-tail-timer)
+          (run-at-time nil highlight-tail-timer
+                       'highlight-tail-fade-out-step)))
+  (setq highlight-tail-defaultbgcolor-timer
+        (if (featurep 'xemacs)
+            (start-itimer "highlight-tail-check-if-defaultbgcolor-changed"
+                          'highlight-tail-check-if-defaultbgcolor-changed
+                          3
+                          3)
+          (run-at-time nil 3
+                       'highlight-tail-check-if-defaultbgcolor-changed))))
+
 (defun highlight-tail-cancel-timers ()
   "Cancel timers"
   (if (featurep 'xemacs)
@@ -954,7 +979,7 @@ Run it, when you've made changes to some highlight-tail-mode variables."
   ;; correctly by the user
   (let ((previous-elem-value -1)   ;first elem should be 0 and 0>-1 :)
         (httmp-signal-error-function
-         '(lambda (elem explanation)
+         (lambda (elem explanation)
             (error
              (format "%s element in `highlight-tail-colors' is wrong! %s"
                      elem explanation)))))
@@ -964,7 +989,7 @@ Run it, when you've made changes to some highlight-tail-mode variables."
              (format "First (%s)" (car highlight-tail-colors))
              (list "Value should be zero.")))
     ;; Check that every element is greater than previous one.
-    (mapcar '(lambda (elem)
+    (mapcar (lambda (elem)
                (if (<= (cdr elem) previous-elem-value)
                    (apply httmp-signal-error-function
                           elem
@@ -985,7 +1010,7 @@ Run it, when you've made changes to some highlight-tail-mode variables."
          ;; create a list of "t"s, color lists '(red 255 0 0) and nils
          ;; in place of colors that doesn't exist
          (mapcar
-          '(lambda (elem)
+          (lambda (elem)
              (let ((color-name (car elem)))
                (if (highlight-tail-color-in-hex-format color-name)
                    ;; does not need to be on system list
@@ -1021,7 +1046,7 @@ Run it, when you've made changes to some highlight-tail-mode variables."
          (percents-vector (make-vector colors-with-100-length nil))
          ;; below: scaled to `highlight-tail-steps'
          (percents-vector-scaled (make-vector colors-with-100-length nil)))
-    (setq percents-vector (mapcar '(lambda (elem)
+    (setq percents-vector (mapcar (lambda (elem)
                                      (cdr elem))
                                   highlight-tail-colors-with-100))
     (setq highlight-tail-stepsperfade-vector
@@ -1046,25 +1071,10 @@ Run it, when you've made changes to some highlight-tail-mode variables."
   (setq highlight-tail-face-max highlight-tail-steps)
   (highlight-tail-make-faces
    (highlight-tail-get-colors-fade-table-with-key 'default))
-
-  (setq highlight-tail-fading-timer
-        (if (featurep 'xemacs)
-            (start-itimer "highlight-tail-fade-out-step"
-                          'highlight-tail-fade-out-step
-                          highlight-tail-timer
-                          highlight-tail-timer)
-          (run-at-time nil highlight-tail-timer
-                       'highlight-tail-fade-out-step)))
-  (setq highlight-tail-defaultbgcolor-timer
-        (if (featurep 'xemacs)
-            (start-itimer "highlight-tail-check-if-defaultbgcolor-changed"
-                          'highlight-tail-check-if-defaultbgcolor-changed
-                          3
-                          3)
-          (run-at-time nil 3
-                       'highlight-tail-check-if-defaultbgcolor-changed)))
+  (highlight-tail-start-timers)
   (add-hook 'post-command-hook 'highlight-tail-post-command))
 
+;;;###autoload
 (defun highlight-tail-mode (&optional arg)
   "Draw a \"tail\" while you're typing.
 
