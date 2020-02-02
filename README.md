@@ -14,8 +14,7 @@ smoothly fade them out to the background color.
 
 So from now on, your Emacs will be even more sexy! ;o )
 
-If you do not understand what I mean, check the animation:
-http://nic-nac-project.net/~necui/img/htshow.gif
+If you do not understand what I mean, check the animation: [demo](./demo.mov)
 
 ## INSTALLATION
 
