@@ -14,8 +14,7 @@ smoothly fade them out to the background color.
 
 So from now on, your Emacs will be even more sexy! ;o )
 
-If you do not understand what I mean, check the animation:
-http://nic-nac-project.net/~necui/img/htshow.gif
+If you do not understand what I mean, check the animation: [demo](./demo.gif)
 
 ## INSTALLATION
 
@@ -66,3 +65,8 @@ me).  When I press a key and hold it down it eats approximately 15%
 The CPU eaten depends mainly on two variables:
 `highlight-tail-steps' and `highlight-tail-timer'.  So combine with
 these two to achieve satisfactory performance.
+
+## Terminals
+
+Highlight-tail doesn't work on terminals (only in window-systems
+like X11)
