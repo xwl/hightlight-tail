@@ -460,7 +460,7 @@ eventually change the last remembered to the current one."
   "Get FACE's background"
   (if (featurep 'xemacs)
       (face-background-name face)
-    (face-attribute face :background)))
+    (ignore-errors (face-background face))))
 
 (defsubst highlight-tail-hex-from-RGB (red green blue)
   "Build a color like #00FF00 from given RED, GREEN and BLUE.
@@ -545,10 +545,10 @@ that if there is ht's overlay at at the top then return 'default"
     ;; remove any highlight-tail's overlays at point
     (let ((overlays-at-start-point (highlight-tail-overlays-at start-point))
           highlight-tail-overlay)
-      (mapcar (lambda (overlay)
-                 (when (highlight-tail-overlay-get overlay 'highlight-tail)
-                   (setq highlight-tail-overlay overlay)))
-              overlays-at-start-point)
+      (mapc (lambda (overlay)
+              (when (highlight-tail-overlay-get overlay 'highlight-tail)
+                (setq highlight-tail-overlay overlay)))
+            overlays-at-start-point)
       (when highlight-tail-overlay
         (add-to-list 'highlight-tail-deleted-overlays-list
                      highlight-tail-overlay)
